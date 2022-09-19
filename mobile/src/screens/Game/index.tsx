@@ -8,12 +8,17 @@ import { Entypo } from "@expo/vector-icons";
 import { THEME } from "../../theme";
 import { Heading } from "../../components/Heading";
 import { DuoCard, DuoCardProps } from "../../components/DuoCard";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import logoImg from "../../assets/logo-nlw-esports.png";
+import { DuoMatch } from "../../components/DuoMatch";
+import { api } from "../../lib/axios";
+import { Loading } from "../../components/Loading";
 
 export function Game() {
   const [duos, setDuos] = useState<DuoCardProps[]>([]);
+  const [discordDuoSelected, setDiscordDuoSelected] = useState("");
+  const [loadingDuos, setLoadingDuos] = useState(true);
 
   const navigation = useNavigation();
 
@@ -24,12 +29,20 @@ export function Game() {
     navigation.goBack();
   }
 
+  const getAds = useCallback(async () => {
+    setLoadingDuos(true);
+    const { data } = await api.get(`/games/${game.id}/ads`)
+    setLoadingDuos(false);
+    setDuos(data);
+  }, [])
+
+  async function getDiscordUser(adId: string) {
+    const { data } = await api.get(`/ads/${adId}/discord`);
+    setDiscordDuoSelected(data.discord);
+  }
+
   useEffect(() => {
-    fetch(`http://192.168.5.13:3333/games/${game.id}/ads`)
-      .then(response => response.json())
-      .then(data => {
-        setDuos(data);
-      })
+    getAds();
   }, []);
 
   return (
@@ -63,24 +76,32 @@ export function Game() {
           subtitle="Conecte-se e comece a jogar!"
         />
 
-        <FlatList
-          data={duos}
-          keyExtractor={item => item.id}
-          renderItem={({ item }) => (
-            <DuoCard
-              data={item}
-              onConnect={() => { alert("OK") }}
-            />
-          )}
-          horizontal
-          style={styles.containerList}
-          contentContainerStyle={[duos.length > 0 ? styles.contentList : styles.emptyListContent]}
-          showsHorizontalScrollIndicator
-          ListEmptyComponent={
-            <Text style={styles.emptyListText}>
-              Não há anúncios publicados ainda.
-            </Text>
-          }
+        {loadingDuos ? <Loading /> : (
+          <FlatList
+            data={duos}
+            keyExtractor={item => item.id}
+            renderItem={({ item }) => (
+              <DuoCard
+                data={item}
+                onConnect={() => getDiscordUser(item.id)}
+              />
+            )}
+            horizontal
+            style={styles.containerList}
+            contentContainerStyle={[duos.length > 0 ? styles.contentList : styles.emptyListContent]}
+            showsHorizontalScrollIndicator
+            ListEmptyComponent={
+              <Text style={styles.emptyListText}>
+                Não há anúncios publicados ainda.
+              </Text>
+            }
+          />
+        )}
+
+        <DuoMatch
+          visible={discordDuoSelected.length > 0}
+          onClose={() => setDiscordDuoSelected("")}
+          discord={discordDuoSelected}
         />
       </SafeAreaView>
     </Background>
